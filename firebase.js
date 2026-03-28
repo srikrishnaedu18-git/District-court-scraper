@@ -1,4 +1,5 @@
 // Import the functions you need from the SDKs you need
+require("dotenv").config();
 const { initializeApp } = require("firebase/app");
 const { getAuth, GoogleAuthProvider } = require("firebase/auth");
 const { getFirestore } = require("firebase/firestore");
@@ -9,13 +10,13 @@ const { getStorage } = require("firebase/storage");
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyAKQVDRTt5i5i0cNyrSxxW_N-S1vpwm4Ec",
-  authDomain: "valsco-jurident.firebaseapp.com",
-  projectId: "valsco-jurident",
-  storageBucket: "valsco-jurident.firebasestorage.app",
-  messagingSenderId: "596718606544",
-  appId: "1:596718606544:web:4dc72fd5ccab6b72bd66d5",
-  measurementId: "G-CVM890582X",
+  apiKey: process.env.FIREBASE_API_KEY,
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.FIREBASE_APP_ID,
+  measurementId: process.env.FIREBASE_MEASUREMENT_ID,
 };
 
 // Initialize Firebase

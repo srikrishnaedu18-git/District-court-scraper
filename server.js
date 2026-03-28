@@ -14,6 +14,8 @@
 
 "use strict";
 
+require("dotenv").config();
+
 const express = require("express");
 const axios = require("axios");
 const { wrapper } = require("axios-cookiejar-support");
@@ -791,54 +793,73 @@ function parseIABusinessHtml(html) {
 }
 
 /** Parse viewBusiness JSON response */
+// BEFORE
 function parseViewBusinessHtml(html) {
   const $ = cheerio.load(html);
   const result = {};
   result.court_name = $("center span").first().text().trim();
   result.court_of = extractLabeledField($, "In the court of");
-  result.cnr_number = $("center span b")
-    .filter((_, el) => $(el).text().includes("CNR"))
-    .parent()
-    .text()
-    .replace(/CNR Number\s*:/i, "")
-    .trim();
-  result.case_number = $("center span b")
-    .filter((_, el) => $(el).text().includes("Case Number"))
-    .parent()
-    .text()
-    .replace(/Case Number\s*:/i, "")
-    .trim();
-  result.parties = $("center span")
-    .filter((_, el) => $(el).text().includes("versus"))
-    .text()
-    .trim();
-  result.date = $("center span b")
-    .filter((_, el) => $(el).text().includes("Date"))
-    .parent()
-    .text()
-    .replace(/Date\s*:/i, "")
-    .trim();
-  result.business = $("b")
-    .filter((_, el) => $(el).text().trim() === "Business")
-    .closest("tr")
-    .find("td")
-    .last()
-    .text()
-    .trim();
-  result.next_purpose = $("b")
-    .filter((_, el) => $(el).text().trim() === "Next Purpose")
-    .closest("tr")
-    .find("td")
-    .last()
-    .text()
-    .trim();
-  result.next_hearing_date = $("b")
-    .filter((_, el) => $(el).text().trim() === "Next Hearing Date")
-    .closest("tr")
-    .find("td")
-    .last()
-    .text()
-    .trim();
+  result.cnr_number = $("center span b").filter((_, el) => $(el).text().includes("CNR")).parent().text().replace(/CNR Number\s*:/i, "").trim();
+  result.case_number = $("center span b").filter((_, el) => $(el).text().includes("Case Number")).parent().text().replace(/Case Number\s*:/i, "").trim();
+  result.parties = $("center span").filter((_, el) => $(el).text().includes("versus")).text().trim();
+  result.date = $("center span b").filter((_, el) => $(el).text().includes("Date")).parent().text().replace(/Date\s*:/i, "").trim();
+  result.business = $("b").filter((_, el) => $(el).text().trim() === "Business").closest("tr").find("td").last().text().trim();
+  result.next_purpose = $("b").filter((_, el) => $(el).text().trim() === "Next Purpose").closest("tr").find("td").last().text().trim();
+  result.next_hearing_date = $("b").filter((_, el) => $(el).text().trim() === "Next Hearing Date").closest("tr").find("td").last().text().trim();
+  return result;
+}
+
+// AFTER
+function parseViewBusinessHtml(html) {
+  const $ = cheerio.load(html);
+  const result = {};
+
+  // The portal renders obj.data_list directly — structure is:
+  // <center><span>Court Name</span></center>
+  // <center><span><b>In the court of&nbsp;</b>:VALUE</span></center>
+  // <center><span><b> CNR Number&nbsp;</b>:VALUE</span></center>
+  // etc.
+
+  $("center span").each((_, el) => {
+    const b = $(el).find("b").first();
+    const bText = b.text().replace(/\u00a0/g, " ").trim(); // strip &nbsp;
+
+    if (!bText) {
+      // Plain span with no <b> = court name
+      const text = $(el).text().trim();
+      if (text && !result.court_name) result.court_name = text;
+      return;
+    }
+
+    // Get the value part: full span text minus the bold label
+    const fullText = $(el).text().replace(/\u00a0/g, " ").trim();
+    const value = fullText.replace(bText, "").replace(/^[\s:]+/, "").trim();
+
+    if (/in the court of/i.test(bText)) result.court_of = value;
+    else if (/cnr number/i.test(bText)) result.cnr_number = value;
+    else if (/case number/i.test(bText)) result.case_number = value;
+    else if (/^date$/i.test(bText)) result.date = value;
+    else if (/versus/.test(fullText) && !bText) result.parties = fullText;
+  });
+
+  // parties span has <b>versus</b> inside, handle separately
+  $("center span").each((_, el) => {
+    if ($(el).find("b").text().replace(/\u00a0/g, " ").trim().toLowerCase() === "versus") {
+      result.parties = $(el).text().replace(/\u00a0/g, " ").trim();
+    }
+  });
+
+  // Table rows: Business, Next Purpose, Next Hearing Date
+  $("table tr").each((_, tr) => {
+    const tds = $(tr).find("td");
+    if (tds.length < 3) return;
+    const label = $(tds[0]).find("b").text().replace(/\u00a0/g, " ").trim();
+    const value = $(tds[2]).text().replace(/\u00a0/g, " ").trim();
+    if (/^business$/i.test(label)) result.business = value;
+    else if (/next purpose/i.test(label)) result.next_purpose = value;
+    else if (/next hearing date/i.test(label)) result.next_hearing_date = value;
+  });
+
   return result;
 }
 
