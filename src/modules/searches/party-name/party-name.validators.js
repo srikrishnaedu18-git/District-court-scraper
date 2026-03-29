@@ -42,13 +42,6 @@ function validateBusinessDetailPost(req, res, next) {
   return next();
 }
 
-function validateBusinessDetailGet(req, res, next) {
-  if (!req.query.sessionId) {
-    return res.status(400).json({ success: false, error: MESSAGES.MISSING_SESSION_ID });
-  }
-  return next();
-}
-
 function validateOrderPdfPost(req, res, next) {
   if (!req.body.sessionId) {
     return res.status(400).json({ success: false, error: MESSAGES.MISSING_SESSION_ID });
@@ -74,7 +67,6 @@ module.exports = {
   validateCaseDetail,
   validateIaBusiness,
   validateBusinessDetailPost,
-  validateBusinessDetailGet,
   validateOrderPdfPost,
   validateOrderPdfGet,
 };

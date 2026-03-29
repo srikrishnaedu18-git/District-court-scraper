@@ -7,14 +7,18 @@ function validateInit(_req, _res, next) {
   next();
 }
 
-function validateCourtDetails(req, res, next) {
+function validateSetFields(req, res, next) {
   const sessionId = req.body.sessionId;
-  const complexCode = firstDefined(req.body.complexCode, req.body.complex_code);
+  const complexCode = firstDefined(
+    req.body.complexCode,
+    req.body.complex_code,
+    req.body.complex_number,
+  );
   const stateCode = firstDefined(req.body.stateCode, req.body.state_code);
   const distCode = firstDefined(req.body.distCode, req.body.dist_code);
 
   if (!sessionId || !complexCode || !stateCode || !distCode) {
-    return res.status(400).json({ success: false, error: COMMON_MESSAGES.MISSING_REQUIRED_FIELDS });
+    return res.status(400).json({ success: false, error: COMMON_MESSAGES.MISSING_SET_FIELDS });
   }
   return next();
 }
@@ -85,7 +89,7 @@ function validateEstablishments(req, res, next) {
 
 module.exports = {
   validateInit,
-  validateCourtDetails,
+  validateSetFields,
   validateSessionIdQuery,
   validateDistricts,
   validateCourts,

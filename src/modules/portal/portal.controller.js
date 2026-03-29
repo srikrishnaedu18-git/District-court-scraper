@@ -2,7 +2,10 @@
 
 const { buildForm, firstDefined, sendJsonSuccess } = require("../../shared/utils/common.util");
 const { COMMON_MESSAGES } = require("./portal.constants");
-const { parseOptionList } = require("../../shared/parsers/option-list.parser");
+const {
+  parseOptionPayload,
+  serializeRawPayload,
+} = require("../../shared/parsers/option-list.parser");
 const {
   fetchCaptchaPayload,
   fetchCourts,
@@ -12,6 +15,44 @@ const {
   setCourtDetails,
 } = require("./portal.service");
 const { createSession, getSession } = require("../../shared/store/sessionStore");
+
+function buildOptionResponse(options) {
+  const normalized = options.map((item) => {
+    const rawCode = String(item.code || "").trim();
+    const hasComplexNumber = rawCode.includes("@");
+    const complexParts = hasComplexNumber ? rawCode.split("@") : [];
+    const trimmedCode = hasComplexNumber ? complexParts[0] : rawCode;
+    const normalizedItem = {
+      code: trimmedCode,
+      options: item.name,
+    };
+    if (hasComplexNumber) {
+      normalizedItem.complex_number = rawCode;
+      if (complexParts[1]) {
+        normalizedItem.court_codes = String(complexParts[1])
+          .split(",")
+          .map((value) => value.trim())
+          .filter(Boolean);
+      }
+      if (complexParts[2]) {
+        normalizedItem.differ_mast_est = String(complexParts[2]).trim();
+      }
+    }
+    return normalizedItem;
+  });
+
+  const name = {};
+  normalized.forEach((item) => {
+    if (item.options && item.code) {
+      name[item.options] = item.code;
+    }
+  });
+
+  return {
+    list: normalized,
+    name,
+  };
+}
 
 async function init(_req, res) {
   try {
@@ -27,12 +68,16 @@ async function init(_req, res) {
   }
 }
 
-async function courtDetails(req, res) {
+async function setFields(req, res) {
   const sessionId = req.body.sessionId;
-  const complexCode = firstDefined(req.body.complexCode, req.body.complex_code);
+  const complexCode = firstDefined(
+    req.body.complexCode,
+    req.body.complex_code,
+    req.body.complex_number,
+  );
   const stateCode = firstDefined(req.body.stateCode, req.body.state_code);
   const distCode = firstDefined(req.body.distCode, req.body.dist_code);
-  const estCode = firstDefined(req.body.estCode, req.body.est_code, "null");
+  const estCode = firstDefined(req.body.estCode, req.body.est_code);
 
   try {
     const session = getSession(sessionId);
@@ -43,7 +88,7 @@ async function courtDetails(req, res) {
       estCode,
     });
     return sendJsonSuccess(res, {
-      message: COMMON_MESSAGES.COURT_DETAILS_SET,
+      message: COMMON_MESSAGES.FIELDS_SET,
       result: data,
     });
   } catch (err) {
@@ -124,14 +169,17 @@ async function districts(req, res) {
 
   try {
     const session = getSession(sessionId);
-    const rawHtml = await fetchDistricts(session, stateCode);
+    const payload = await fetchDistricts(session, stateCode);
+    const parsedOptions = parseOptionPayload(payload);
+    const optionResponse = buildOptionResponse(parsedOptions);
     return sendJsonSuccess(res, {
       message: COMMON_MESSAGES.DISTRICTS_FETCHED,
       result: {
         state_code: String(stateCode),
-        districts: parseOptionList(rawHtml),
+        districts: optionResponse.list,
+        name: optionResponse.name,
       },
-      rawHtml,
+      rawHtml: serializeRawPayload(payload),
     });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
@@ -155,15 +203,18 @@ async function courts(req, res) {
 
   try {
     const session = getSession(sessionId);
-    const rawHtml = await fetchCourts(session, { stateCode, distCode });
+    const payload = await fetchCourts(session, { stateCode, distCode });
+    const parsedOptions = parseOptionPayload(payload);
+    const optionResponse = buildOptionResponse(parsedOptions);
     return sendJsonSuccess(res, {
       message: COMMON_MESSAGES.COURTS_FETCHED,
       result: {
         state_code: String(stateCode),
         dist_code: String(distCode),
-        courts: parseOptionList(rawHtml),
+        courts: optionResponse.list,
+        name: optionResponse.name,
       },
-      rawHtml,
+      rawHtml: serializeRawPayload(payload),
     });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
@@ -193,20 +244,23 @@ async function establishments(req, res) {
 
   try {
     const session = getSession(sessionId);
-    const rawHtml = await fetchEstablishments(session, {
+    const payload = await fetchEstablishments(session, {
       stateCode,
       distCode,
       courtComplexCode,
     });
+    const parsedOptions = parseOptionPayload(payload);
+    const optionResponse = buildOptionResponse(parsedOptions);
     return sendJsonSuccess(res, {
       message: COMMON_MESSAGES.ESTABLISHMENTS_FETCHED,
       result: {
         state_code: String(stateCode),
         dist_code: String(distCode),
         court_complex_code: String(courtComplexCode),
-        establishments: parseOptionList(rawHtml),
+        establishments: optionResponse.list,
+        name: optionResponse.name,
       },
-      rawHtml,
+      rawHtml: serializeRawPayload(payload),
     });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
@@ -215,7 +269,7 @@ async function establishments(req, res) {
 
 module.exports = {
   init,
-  courtDetails,
+  setFields,
   captcha,
   captchaDebug,
   captchaImage,

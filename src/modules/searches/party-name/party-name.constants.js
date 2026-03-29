@@ -16,7 +16,7 @@ const MESSAGES = {
   MISSING_CASE_DATA_FIELDS:
     "Missing required fields: sessionId, petresName/petres_name, captchaCode/fcaptcha_code",
   COURT_DETAILS_NOT_SET:
-    "Court details not set. Call /api/partyname/court-details first.",
+    "Court context not set. Call /api/common/establishments first, or pass stateCode/distCode/courtComplexCode in the request.",
   EMPTY_SEARCH_RESPONSE:
     "Empty response from eCourts. Captcha may be wrong or session expired.",
   EMPTY_PARTY_DATA_RESPONSE:

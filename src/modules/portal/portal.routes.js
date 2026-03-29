@@ -10,9 +10,9 @@ const router = express.Router();
 
 router.post(COMMON_ROUTE_PATHS.INIT, validators.validateInit, controller.init);
 router.post(
-  COMMON_ROUTE_PATHS.COURT_DETAILS,
-  validators.validateCourtDetails,
-  controller.courtDetails,
+  COMMON_ROUTE_PATHS.SET_FIELDS,
+  validators.validateSetFields,
+  controller.setFields,
 );
 router.get(
   COMMON_ROUTE_PATHS.CAPTCHA,

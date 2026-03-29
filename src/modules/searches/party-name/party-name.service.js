@@ -179,7 +179,6 @@ function buildPartySearchSuccessResponse({
         complexCode: String(resolvedComplex || ""),
       },
       courtBreakdown,
-      sampleCases: cases.slice(0, 5),
       parsedCases: cases,
       nextCaptcha,
       div_captcha: responseCaptchaFragment,

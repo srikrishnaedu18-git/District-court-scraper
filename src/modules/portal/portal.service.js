@@ -123,27 +123,24 @@ async function fetchCaptchaPayload(session, { warm = true } = {}) {
 }
 
 async function fetchDistricts(session, stateCode) {
-  const html = await postWithRetry(session, "casestatus/fillDistrict", {
+  return postWithRetry(session, "casestatus/fillDistrict", {
     state_code: stateCode,
   });
-  return typeof html === "string" ? html : String(html || "");
 }
 
 async function fetchCourts(session, { stateCode, distCode }) {
-  const html = await postWithRetry(session, "casestatus/fillcomplex", {
+  return postWithRetry(session, "casestatus/fillcomplex", {
     state_code: stateCode,
     dist_code: distCode,
   });
-  return typeof html === "string" ? html : String(html || "");
 }
 
 async function fetchEstablishments(session, { stateCode, distCode, courtComplexCode }) {
-  const html = await postWithRetry(session, "casestatus/fillCourtEstablishment", {
+  return postWithRetry(session, "casestatus/fillCourtEstablishment", {
     state_code: stateCode,
     dist_code: distCode,
     court_complex_code: courtComplexCode,
   });
-  return typeof html === "string" ? html : String(html || "");
 }
 
 module.exports = {

@@ -2,7 +2,7 @@
 
 const COMMON_ROUTE_PATHS = {
   INIT: "/init",
-  COURT_DETAILS: "/court-details",
+  SET_FIELDS: "/set-fields",
   CAPTCHA: "/captcha",
   CAPTCHA_DEBUG: "/captcha-debug",
   CAPTCHA_IMAGE: "/captcha-image",

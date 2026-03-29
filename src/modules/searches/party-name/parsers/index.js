@@ -166,25 +166,71 @@ function extractLabeledField($, label) {
   return value;
 }
 
+function extractLabeledFieldFromTable($, tableSelector, label) {
+  const table = $(tableSelector).first();
+  if (!table.length) return "";
+
+  let value = "";
+  table.find("tr").each((_, tr) => {
+    const cells = $(tr).find("th, td");
+    const labelCell = cells.first();
+    const valueCell = cells.eq(1);
+    const labelText = labelCell.text().replace(/\s+/g, " ").trim().toLowerCase();
+    if (labelText === label.toLowerCase() && valueCell.length) {
+      value = valueCell.text().replace(/\s+/g, " ").trim();
+      return false;
+    }
+    return undefined;
+  });
+
+  return value;
+}
+
 function parsePetitionerRespondent($, type) {
+  const directSelector =
+    type === "Petitioner"
+      ? ".Petitioner_Advocate_table li, .petitioner-advocate-list li"
+      : ".Respondent_Advocate_table li, .respondent-advocate-list li";
+
+  const directMatches = $(directSelector)
+    .map((_, li) => {
+      const html = $(li).html() || "";
+      return html
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/&nbsp;/gi, " ")
+        .replace(/<[^>]+>/g, "")
+        .split("\n")
+        .map((line) => line.replace(/\s+/g, " ").trim())
+        .filter(Boolean);
+    })
+    .get()
+    .flat()
+    .filter(Boolean);
+
+  if (directMatches.length) {
+    return directMatches;
+  }
+
   const parties = [];
   const heading =
     type === "Petitioner" ? "Petitioner and Advocate" : "Respondent and Advocate";
 
   $("h3, h4, .pra_heading, td").each((_, el) => {
-    if ($(el).text().trim().toLowerCase().includes(heading.toLowerCase())) {
-      let sibling = $(el).parent().next();
-      while (sibling.length) {
-        const text = sibling.text().trim();
-        if (
-          !text ||
-          text.toLowerCase().includes("petitioner") ||
-          text.toLowerCase().includes("respondent")
-        ) {
-          break;
-        }
-        if (text) parties.push(text);
-        sibling = sibling.next();
+    const headingText = $(el).text().replace(/\s+/g, " ").trim().toLowerCase();
+    if (!headingText.includes(heading.toLowerCase())) return;
+
+    const nextBlock = $(el).nextAll("ul, table").first();
+    if (nextBlock.length) {
+      if (nextBlock.is("ul")) {
+        nextBlock.find("li").each((__, li) => {
+          const text = $(li).text().replace(/\s+/g, " ").trim();
+          if (text) parties.push(text);
+        });
+      } else {
+        nextBlock.find("tr").each((__, tr) => {
+          const text = $(tr).text().replace(/\s+/g, " ").trim();
+          if (text) parties.push(text);
+        });
       }
     }
   });
@@ -194,7 +240,7 @@ function parsePetitionerRespondent($, type) {
       const caption = $(table).prev("h3, h4").text().trim();
       if (caption.toLowerCase().includes(type.toLowerCase())) {
         $(table).find("tr").each((__, tr) => {
-          const text = $(tr).text().trim();
+          const text = $(tr).text().replace(/\s+/g, " ").trim();
           if (text) parties.push(text);
         });
       }
@@ -259,9 +305,9 @@ function parseIaStatusTable($) {
         ia_number: iaLink.length ? iaLink.text().trim() : $(tds[0]).text().trim(),
         ia_onclick: iaLink.attr("onclick") || "",
         ia_href: iaLink.attr("href") || "",
-        party_name: $(tds[1]).text().trim(),
+        party_name: $(tds[1]).text().replace(/\s+/g, " ").trim(),
         date_of_filing: $(tds[2]).text().trim(),
-        next_date_purpose: $(tds[3]).text().trim(),
+        next_date_purpose: $(tds[3]).text().replace(/\s+/g, " ").trim(),
         ia_status: $(tds[4]).text().trim(),
       };
 
@@ -339,7 +385,6 @@ function parseCaseHistoryTable($) {
         business_on_date: businessOnDate,
         hearing_date: $(tds[2]).text().trim(),
         purpose_of_hearing: tds[3] ? $(tds[3]).text().trim() : "",
-        business_on_date_onclick: bodOnClick,
       };
 
       if (bodOnClick) {
@@ -365,14 +410,35 @@ function parseDisplayPdfOnClick(raw) {
   };
 }
 
-function parseInterimOrdersTable($) {
+function findOrderSectionHeading($, table) {
+  let heading = "";
+  $(table)
+    .prevAll()
+    .each((_, prev) => {
+      const text = $(prev).text().replace(/\s+/g, " ").trim();
+      if (/interim orders|final orders|judgements/i.test(text)) {
+        heading = text;
+        return false;
+      }
+      return undefined;
+    });
+
+  return heading;
+}
+
+function parseOrderTable($, headingMatcher) {
   const orders = [];
   $("table").each((_, table) => {
-    const heading =
-      $(table).prev("h3, h4, .pra_heading").text().trim() +
+    const heading = (
+      findOrderSectionHeading($, table) +
+      " " +
       $(table).find("caption").text() +
-      $(table).find("th").first().text();
-    if (!heading.toLowerCase().includes("order")) return;
+      " " +
+      $(table).find("th").first().text()
+    )
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!headingMatcher(heading.toLowerCase())) return;
 
     $(table).find("tbody tr, tr").each((__, tr) => {
       const tds = $(tr).find("td");
@@ -386,7 +452,6 @@ function parseInterimOrdersTable($) {
         order_details: orderLink.length
           ? orderLink.text().trim()
           : orderDetailsCell.text().trim(),
-        order_href: orderLink.attr("href") || "",
         order_onclick: orderLink.attr("onclick") || "",
       };
 
@@ -398,6 +463,20 @@ function parseInterimOrdersTable($) {
     });
   });
   return orders;
+}
+
+function parseInterimOrdersTable($) {
+  return parseOrderTable(
+    $,
+    (heading) => heading.includes("interim orders"),
+  );
+}
+
+function parseFinalOrdersTable($) {
+  return parseOrderTable(
+    $,
+    (heading) => heading.includes("final orders") || heading.includes("judgements"),
+  );
 }
 
 function parseConnectedCases($) {
@@ -421,6 +500,8 @@ function parseConnectedCases($) {
 function parseCaseDetail(html) {
   const $ = cheerio.load(html);
   const result = {};
+
+  result.court_name = $("#chHeading").first().text().replace(/\s+/g, " ").trim();
 
   $("table.case_details_table, .case_details_table")
     .first()
@@ -455,16 +536,20 @@ function parseCaseDetail(html) {
     extractLabeledField($, "CNR Number") || $(".cnrno, #cnr_no").text().trim();
   result.efiling_number = extractLabeledField($, "e-Filing Number");
   result.efiling_date = extractLabeledField($, "e-Filing Date");
-  result.first_hearing_date = extractLabeledField($, "First Hearing Date");
-  result.next_hearing_date = extractLabeledField($, "Next Hearing Date");
-  result.case_stage = extractLabeledField($, "Case Stage");
-  result.court_number_and_judge = extractLabeledField($, "Court Number and Judge");
+  result.first_hearing_date = extractLabeledFieldFromTable($, ".case_status_table", "First Hearing Date");
+  result.decision_date = extractLabeledFieldFromTable($, ".case_status_table", "Decision Date");
+  result.next_hearing_date = extractLabeledFieldFromTable($, ".case_status_table", "Next Hearing Date");
+  result.case_status = extractLabeledFieldFromTable($, ".case_status_table", "Case Status");
+  result.nature_of_disposal = extractLabeledFieldFromTable($, ".case_status_table", "Nature of Disposal");
+  result.case_stage = extractLabeledFieldFromTable($, ".case_status_table", "Case Stage");
+  result.court_number_and_judge = extractLabeledFieldFromTable($, ".case_status_table", "Court Number and Judge");
   result.petitioners = parsePetitionerRespondent($, "Petitioner");
   result.respondents = parsePetitionerRespondent($, "Respondent");
   result.acts = parseActsTable($);
   result.ia_status = parseIaStatusTable($);
   result.history_of_case_hearing = parseCaseHistoryTable($);
   result.interim_orders = parseInterimOrdersTable($);
+  result.final_orders = parseFinalOrdersTable($);
   result.connected_cases = parseConnectedCases($);
 
   return result;
@@ -472,12 +557,19 @@ function parseCaseDetail(html) {
 
 function parseIABusinessHtml(html) {
   const $ = cheerio.load(html);
-  const caseNo =
+  const rawCaseNo =
+    html.match(/Case\s*No\s*[:\-]+\s*([^<\r\n]+)/i)?.[1]?.trim() ||
     $("table")
       .first()
       .text()
-      .match(/Case No[:\-]?\s*([^\n<]+)/i)?.[1]
-      ?.trim() || "";
+      .match(/Case\s*No\s*[:\-]+\s*([^\r\n]+)/i)?.[1]
+      ?.trim() ||
+    $.root()
+      .text()
+      .match(/Case\s*No\s*[:\-]+\s*([^\r\n]+)/i)?.[1]
+      ?.trim() ||
+    "";
+  const caseNo = rawCaseNo.replace(/^[-:\s]+/, "").trim();
   const rows = [];
 
   $("table tbody tr, table tr").each((_, tr) => {
