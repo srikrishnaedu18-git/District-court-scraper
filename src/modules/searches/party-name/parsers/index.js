@@ -353,7 +353,7 @@ function parseCaseHistoryTable($) {
 }
 
 function parseDisplayPdfOnClick(raw) {
-  const match = raw.match(/displayPDF\(([^)]+)\)/);
+  const match = raw.match(/displayPdf\(([^)]+)\)/i);
   if (!match) return {};
   const parts = match[1].split(",").map((s) => s.trim().replace(/^'|'$/g, ""));
   return {

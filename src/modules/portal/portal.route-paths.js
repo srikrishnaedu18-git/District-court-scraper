@@ -8,6 +8,7 @@ const COMMON_ROUTE_PATHS = {
   CAPTCHA_IMAGE: "/captcha-image",
   DISTRICTS: "/districts",
   COURTS: "/courts",
+  ESTABLISHMENTS: "/establishments",
 };
 
 module.exports = {

@@ -35,5 +35,10 @@ router.all(
   validators.validateCourts,
   controller.courts,
 );
+router.all(
+  COMMON_ROUTE_PATHS.ESTABLISHMENTS,
+  validators.validateEstablishments,
+  controller.establishments,
+);
 
 module.exports = router;

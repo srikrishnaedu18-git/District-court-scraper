@@ -137,6 +137,15 @@ async function fetchCourts(session, { stateCode, distCode }) {
   return typeof html === "string" ? html : String(html || "");
 }
 
+async function fetchEstablishments(session, { stateCode, distCode, courtComplexCode }) {
+  const html = await postWithRetry(session, "casestatus/fillCourtEstablishment", {
+    state_code: stateCode,
+    dist_code: distCode,
+    court_complex_code: courtComplexCode,
+  });
+  return typeof html === "string" ? html : String(html || "");
+}
+
 module.exports = {
   initSession,
   postWithRetry,
@@ -144,4 +153,5 @@ module.exports = {
   fetchCaptchaPayload,
   fetchDistricts,
   fetchCourts,
+  fetchEstablishments,
 };
