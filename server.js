@@ -323,22 +323,26 @@ function buildPartySearchSuccessResponse({
   searchBy = "CSpartyName",
 }) {
   return {
-    success: true,
     status: normalizedSearch.upstreamStatus ?? 1,
     message: "Valid party-name search result parsed from raw.party_data",
-    metadata: {
-      totalEstablishments: metadata.totalEstablishments || 0,
-      totalCases: metadata.totalCases || 0,
-      courtName: metadata.courtName || "",
-      searchBy: "partyName",
-      searchType: searchBy,
-      stateCode: String(resolvedState || ""),
-      distCode: String(resolvedDist || ""),
-      complexCode: String(resolvedComplex || ""),
+    result: {
+      metadata: {
+        totalEstablishments: metadata.totalEstablishments || 0,
+        totalCases: metadata.totalCases || 0,
+        courtName: metadata.courtName || "",
+        searchBy: "partyName",
+        searchType: searchBy,
+        stateCode: String(resolvedState || ""),
+        distCode: String(resolvedDist || ""),
+        complexCode: String(resolvedComplex || ""),
+      },
+      courtBreakdown,
+      sampleCases: cases.slice(0, 5),
+      parsedCases: cases,
+      nextCaptcha,
+      div_captcha: responseCaptchaFragment,
     },
-    courtBreakdown,
-    parsedCases: cases,
-    nextCaptcha,
+    rawHtml: layer1Html,
   };
 }
 
@@ -985,6 +989,17 @@ function buildBusinessDetailQueryParams(query) {
   };
 }
 
+function sendJsonSuccess(res, { status = 1, message = "Success", result = {}, rawHtml = null, extra = {} }) {
+  return res.json({
+    success: true,
+    status,
+    message,
+    result,
+    rawHtml,
+    ...extra,
+  });
+}
+
 // ─── Layer Fetch Helpers ─────────────────────────────────────────────────────
 
 /** Layer 2: viewHistory – full case detail */
@@ -1031,7 +1046,11 @@ async function fetchIABusiness(session, iaParams, parentCino) {
     search_by: iaParams.search_by || "CSpartyName",
   });
   const html = typeof data === "object" ? data.data_list : data;
-  return parseIABusinessHtml(html || "");
+  return {
+    result: parseIABusinessHtml(html || ""),
+    rawHtml: html || "",
+    raw: data,
+  };
 }
 
 /** Layer 3.2: viewBusiness */
@@ -1060,6 +1079,7 @@ async function fetchViewBusiness(session, bParams, cino) {
   return {
     status: normalized.upstreamStatus ?? 1,
     data_list: normalized.html || "",
+    rawHtml: normalized.html || "",
     parsed: parseViewBusinessHtml(normalized.html || ""),
     raw: normalized.raw,
     requestPayload: payload,
@@ -1118,7 +1138,10 @@ app.post("/api/partyname/init", async (req, res) => {
       params: { p: "casestatus/index", app_token: "" },
     });
 
-    res.json({ success: true, sessionId });
+    return sendJsonSuccess(res, {
+      message: "Session initialized successfully",
+      result: { sessionId },
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -1155,7 +1178,10 @@ app.post("/api/partyname/court-details", async (req, res) => {
     session.estCode =
       typeof data === "object" ? data.est_code : estCode || "null";
 
-    res.json({ success: true, data });
+    return sendJsonSuccess(res, {
+      message: "Court details set successfully",
+      result: data,
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -1181,10 +1207,9 @@ app.get("/api/partyname/captcha", async (req, res) => {
       warm: true,
     });
 
-    res.json({
-      success: true,
-      captcha,
-      contentType,
+    return sendJsonSuccess(res, {
+      message: "Captcha fetched successfully",
+      result: { captcha, contentType },
     });
   } catch (err) {
     console.error("captcha error:", err.message);
@@ -1420,19 +1445,19 @@ app.post("/api/partyname/case-data", async (req, res) => {
       parsePartyNameResults(layer1Html);
 
     if (!fetchDetails) {
-      return res.json(
-        buildPartySearchSuccessResponse({
-          normalizedSearch,
-          layer1Html,
-          nextCaptcha,
-          cases,
-          metadata,
-          courtBreakdown,
-          resolvedState,
-          resolvedDist,
-          resolvedComplex,
-        }),
-      );
+      const payload = buildPartySearchSuccessResponse({
+        normalizedSearch,
+        layer1Html,
+        responseCaptchaFragment,
+        nextCaptcha,
+        cases,
+        metadata,
+        courtBreakdown,
+        resolvedState,
+        resolvedDist,
+        resolvedComplex,
+      });
+      return sendJsonSuccess(res, payload);
     }
 
     // ── Layer 2+: fetch full details for each case ────────────────────────
@@ -1469,11 +1494,13 @@ app.post("/api/partyname/case-data", async (req, res) => {
           for (const ia of caseDetail.ia_status) {
             if (ia.ia_params && ia.ia_params.ia_no) {
               try {
-                ia.ia_business = await fetchIABusiness(
+                const iaBusinessResponse = await fetchIABusiness(
                   session,
                   ia.ia_params,
                   vd.cino,
                 );
+                ia.ia_business = iaBusinessResponse.result;
+                ia.ia_business_rawHtml = iaBusinessResponse.rawHtml;
               } catch (e) {
                 ia.ia_business = { error: e.message };
               }
@@ -1523,6 +1550,7 @@ app.post("/api/partyname/case-data", async (req, res) => {
     const successPayload = buildPartySearchSuccessResponse({
       normalizedSearch,
       layer1Html,
+      responseCaptchaFragment,
       nextCaptcha,
       cases: enrichedCases,
       metadata,
@@ -1532,9 +1560,8 @@ app.post("/api/partyname/case-data", async (req, res) => {
       resolvedComplex,
     });
 
-    successPayload.parsedCases = enrichedCases;
-
-    res.json(successPayload);
+    successPayload.result.parsedCases = enrichedCases;
+    return sendJsonSuccess(res, successPayload);
   } catch (err) {
     console.error("case-data error:", err);
     res.status(500).json({ success: false, status: 0, error: err.message });
@@ -1593,13 +1620,12 @@ app.post("/api/partyname/case-detail", async (req, res) => {
 
     const html = await fetchViewHistory(session, params);
     const detail = parseCaseDetail(html);
-    res.json({
-      success: true,
-      status: 1,
+    return sendJsonSuccess(res, {
       message: "Case details fetched successfully",
-      detail,
+      result: detail,
       rawHtml: html,
-      requestPayload: {
+      extra: {
+        requestPayload: {
         court_code: params.courtCode,
         state_code: params.stateCode || session.stateCode,
         dist_code: params.distCode || session.distCode,
@@ -1609,6 +1635,7 @@ app.post("/api/partyname/case-detail", async (req, res) => {
         hideparty: params.hideparty || "",
         search_flag: params.searchFlag || "CScaseNumber",
         search_by: params.searchBy || "CSpartyName",
+        },
       },
     });
   } catch (err) {
@@ -1627,8 +1654,12 @@ app.post("/api/partyname/ia-business", async (req, res) => {
 
   try {
     const session = getSession(sessionId);
-    const result = await fetchIABusiness(session, iaParams, iaParams.cinoia);
-    res.json({ success: true, result });
+    const iaResponse = await fetchIABusiness(session, iaParams, iaParams.cinoia);
+    return sendJsonSuccess(res, {
+      message: "IA business fetched successfully",
+      result: iaResponse.result,
+      rawHtml: iaResponse.rawHtml,
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -1670,11 +1701,11 @@ app.post("/api/partyname/business-detail", async (req, res) => {
       });
     }
 
-    res.json({
-      success: true,
+    return sendJsonSuccess(res, {
       status: result.status,
       message: "Business details fetched successfully",
       result: result.parsed,
+      rawHtml: result.rawHtml,
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -1723,11 +1754,11 @@ app.get("/api/partyname/business-detail", async (req, res) => {
       return res.send(pdfBuffer);
     }
 
-    return res.json({
-      success: true,
+    return sendJsonSuccess(res, {
       status: result.status,
       message: "Business details fetched successfully",
       result: result.parsed,
+      rawHtml: result.rawHtml,
     });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
@@ -1802,7 +1833,10 @@ app.post("/api/partyname/order-pdf", async (req, res) => {
   try {
     const session = getSession(sessionId);
     const result = await fetchDisplayPdf(session, pdfParams);
-    res.json({ success: true, result });
+    return sendJsonSuccess(res, {
+      message: "Order PDF metadata fetched successfully",
+      result,
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
