@@ -4,6 +4,7 @@ const MESSAGES = {
   SESSION_INITIALIZED: "Session initialized successfully",
   COURT_DETAILS_SET: "Court details set successfully",
   CAPTCHA_FETCHED: "Captcha fetched successfully",
+  CASE_TYPES_FETCHED: "Case types fetched successfully",
   CASE_SEARCH_FETCHED: "Valid case-number search result parsed from raw.case_data",
   CASE_DETAIL_FETCHED: "Case details fetched successfully",
   IA_BUSINESS_FETCHED: "IA business fetched successfully",
@@ -15,6 +16,8 @@ const MESSAGES = {
     "Missing required fields: caseNo/case_no, cino, courtCode/court_code",
   MISSING_CASE_DATA_FIELDS:
     "Missing required fields: sessionId, caseType/case_type, searchCaseNo/search_case_no, rgyear, captchaCode/case_captcha_code",
+  MISSING_CASE_TYPES_FIELDS:
+    "Missing required fields: sessionId, stateCode/state_code, distCode/dist_code, courtComplexCode/court_complex_code, searchType/search_type",
   COURT_DETAILS_NOT_SET:
     "Court context not set. Call /api/common/establishments first, or pass stateCode/distCode/courtComplexCode in the request.",
   EMPTY_SEARCH_RESPONSE:

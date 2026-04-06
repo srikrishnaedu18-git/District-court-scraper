@@ -21,6 +21,11 @@ router.get(
   portalController.captchaImage,
 );
 router.post(
+  CASENUMBER_ROUTE_PATHS.CASE_TYPES,
+  validators.validateCaseTypes,
+  controller.caseTypes,
+);
+router.post(
   CASENUMBER_ROUTE_PATHS.CASE_DATA,
   validators.validateCaseData,
   controller.caseData,

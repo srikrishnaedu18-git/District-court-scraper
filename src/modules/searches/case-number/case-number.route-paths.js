@@ -3,6 +3,7 @@
 const CASENUMBER_ROUTE_PATHS = {
   CAPTCHA: "/captcha",
   CAPTCHA_IMAGE: "/captcha-image",
+  CASE_TYPES: "/case-types",
   CASE_DATA: "/case-data",
   CASE_DETAIL: "/case-detail",
   IA_BUSINESS: "/ia-business",

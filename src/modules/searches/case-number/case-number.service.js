@@ -3,6 +3,10 @@
 const { BASE_URL } = require("../../../config/ecourts");
 const { postWithRetry, fetchCaptchaPayload } = require("../../portal/portal.service");
 const {
+  parseOptionPayload,
+  serializeRawPayload,
+} = require("../../../shared/parsers/option-list.parser");
+const {
   normalizeCaseNumberSearchResponse,
   normalizeViewBusinessResponse,
   parseIABusinessHtml,
@@ -19,6 +23,51 @@ function buildCaptchaFragment(captchaPayload) {
     "</div>",
     "</div>",
   ].join("");
+}
+
+function buildOptionResponse(options) {
+  const normalized = options.map((item) => ({
+    code: String(item.code || "").trim(),
+    options: String(item.name || "").trim(),
+  }));
+
+  const name = {};
+  normalized.forEach((item) => {
+    if (item.code && item.options) {
+      name[item.options] = item.code;
+    }
+  });
+
+  return {
+    list: normalized,
+    name,
+  };
+}
+
+async function fetchCaseTypes(
+  session,
+  {
+    stateCode,
+    distCode,
+    courtComplexCode,
+    estCode = "",
+    searchType,
+  },
+) {
+  const payload = await postWithRetry(session, "casestatus/fillCaseType", {
+    state_code: stateCode,
+    dist_code: distCode,
+    court_complex_code: courtComplexCode,
+    est_code: estCode,
+    search_type: searchType,
+  });
+
+  const parsedOptions = parseOptionPayload(payload);
+  return {
+    options: buildOptionResponse(parsedOptions),
+    rawHtml: serializeRawPayload(payload),
+    raw: payload,
+  };
 }
 
 /**
@@ -194,6 +243,7 @@ function buildCaseNumberSearchSuccessResponse({
 module.exports = {
   fetchCaptchaPayload,
   buildCaptchaFragment,
+  fetchCaseTypes,
   postWithRetry,
   fetchViewHistory,
   fetchIABusiness,

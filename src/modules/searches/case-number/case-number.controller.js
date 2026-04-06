@@ -10,6 +10,7 @@ const {
   buildBusinessDetailQueryParams,
   buildCaptchaFragment,
   buildCaseNumberSearchSuccessResponse,
+  fetchCaseTypes,
   fetchCaptchaPayload,
   fetchDisplayPdf,
   fetchDisplayPdfBinary,
@@ -148,6 +149,59 @@ function buildCaseDetailSections(caseDetail) {
 
 /**
  * Layer 1 – Submit Case Number search.
+ * POST payload to casestatus/submitCaseNo:
+ *   case_type, search_case_no, rgyear, case_captcha_code,
+ *   state_code, dist_code, court_complex_code, est_code,
+ *   case_type (duplicated), case_no, rgyear (duplicated)
+ *
+ * Response JSON: { case_data, status, div_captcha }
+ */
+async function caseTypes(req, res) {
+  const sessionId = req.body.sessionId;
+  const stateCode = firstDefined(req.body.stateCode, req.body.state_code);
+  const distCode = firstDefined(req.body.distCode, req.body.dist_code);
+  const courtComplexCode = firstDefined(
+    req.body.courtComplexCode,
+    req.body.court_complex_code,
+  );
+  const estCode = firstDefined(req.body.estCode, req.body.est_code, "");
+  const searchType = firstDefined(req.body.searchType, req.body.search_type);
+
+  try {
+    const session = getSession(sessionId);
+    session.stateCode = stateCode;
+    session.distCode = distCode;
+    session.complexCode = courtComplexCode;
+    session.estCode = estCode;
+
+    const payload = await fetchCaseTypes(session, {
+      stateCode,
+      distCode,
+      courtComplexCode,
+      estCode,
+      searchType,
+    });
+
+    return sendJsonSuccess(res, {
+      message: MESSAGES.CASE_TYPES_FETCHED,
+      result: {
+        state_code: String(stateCode),
+        dist_code: String(distCode),
+        court_complex_code: String(courtComplexCode),
+        est_code: String(estCode),
+        search_type: String(searchType),
+        caseTypes: payload.options.list,
+        name: payload.options.name,
+      },
+      rawHtml: payload.rawHtml,
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+/**
+ * Layer 1 â€“ Submit Case Number search.
  * POST payload to casestatus/submitCaseNo:
  *   case_type, search_case_no, rgyear, case_captcha_code,
  *   state_code, dist_code, court_complex_code, est_code,
@@ -519,6 +573,7 @@ async function orderPdfGet(req, res) {
 }
 
 module.exports = {
+  caseTypes,
   caseData,
   caseDetail,
   iaBusiness,

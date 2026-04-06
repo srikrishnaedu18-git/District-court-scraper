@@ -3,6 +3,25 @@
 const { firstDefined } = require("./utils/common");
 const { MESSAGES } = require("./case-number.constants");
 
+function validateCaseTypes(req, res, next) {
+  const stateCode = firstDefined(req.body.stateCode, req.body.state_code);
+  const distCode = firstDefined(req.body.distCode, req.body.dist_code);
+  const courtComplexCode = firstDefined(
+    req.body.courtComplexCode,
+    req.body.court_complex_code,
+  );
+  const searchType = firstDefined(req.body.searchType, req.body.search_type);
+
+  if (!req.body.sessionId || !stateCode || !distCode || !courtComplexCode || !searchType) {
+    return res.status(400).json({
+      success: false,
+      status: 0,
+      error: MESSAGES.MISSING_CASE_TYPES_FIELDS,
+    });
+  }
+  return next();
+}
+
 /**
  * Validates Layer 1 case-data request.
  * Required: sessionId, caseType (case_type), searchCaseNo (search_case_no),
@@ -71,6 +90,7 @@ function validateOrderPdfGet(req, res, next) {
 }
 
 module.exports = {
+  validateCaseTypes,
   validateCaseData,
   validateCaseDetail,
   validateIaBusiness,
