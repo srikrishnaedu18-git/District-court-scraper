@@ -1,122 +1,229 @@
-# District Court CURLS + Postman Raw JSON
+# District Court API - cURL + Postman Raw JSON
 
 Base URL:
-`https://<your-district-domain>`
+`https://district-court-scraper.onrender.com`
 
-Health:
+## 1) Initialize Session
 ```bash
-curl "https://<your-district-domain>/health"
-```
-
-Most routes are under `/api/*`.
-
-## 1. Init Session
-```bash
-curl -X POST "https://<your-district-domain>/api/common/init" \
+curl -X POST "https://district-court-scraper.onrender.com/api/common/init" \
   -H "Content-Type: application/json" \
-  -d '{"stateCode":"26"}'
+  -d '{}'
+```
+Postman Body:
+```json
+{}
 ```
 
-Postman Body -> raw -> JSON
+## 2) Get Districts
+```bash
+curl -X POST "https://district-court-scraper.onrender.com/api/common/districts" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sessionId": "{{session_id}}",
+    "stateCode": "26"
+  }'
+```
+Postman Body:
 ```json
 {
+  "sessionId": "{{session_id}}",
   "stateCode": "26"
 }
 ```
 
-## 2. Captcha
+## 3) Get Courts
 ```bash
-curl "https://<your-district-domain>/api/common/captcha?sessionId=<sessionId>"
-```
-
-## 3. Set Fields
-```bash
-curl -X POST "https://<your-district-domain>/api/common/set-fields" \
+curl -X POST "https://district-court-scraper.onrender.com/api/common/courts" \
   -H "Content-Type: application/json" \
   -d '{
-    "sessionId": "<sessionId>",
-    "stateCode": "26",
-    "distCode": "8",
-    "complexCode": "1260008",
-    "estCode": "5"
+    "sessionId": "{{session_id}}",
+    "stateCode": "10",
+    "distCode": "13"
   }'
 ```
-
-Postman Body -> raw -> JSON
+Postman Body:
 ```json
 {
-  "sessionId": "<sessionId>",
-  "stateCode": "26",
-  "distCode": "8",
-  "complexCode": "1260008",
-  "estCode": "5"
+  "sessionId": "{{session_id}}",
+  "stateCode": "10",
+  "distCode": "13"
 }
 ```
 
-## 4. Party Name Search
+## 4) Get Establishments
 ```bash
-curl -X POST "https://<your-district-domain>/api/partyname/case-data" \
+curl -X POST "https://district-court-scraper.onrender.com/api/common/establishments" \
   -H "Content-Type: application/json" \
   -d '{
-    "sessionId": "<sessionId>",
-    "stateCode": "26",
-    "distCode": "8",
-    "courtComplexCode": "1260008",
-    "estCode": "5",
-    "partyName": "RAHUL",
-    "partyType": "P",
-    "caseStatus": "Pending",
-    "captcha": "AB12C"
+    "sessionId": "{{session_id}}",
+    "stateCode": "10",
+    "distCode": "13",
+    "courtComplexCode": "1100124"
   }'
 ```
-
-Postman Body -> raw -> JSON
+Postman Body:
 ```json
 {
-  "sessionId": "<sessionId>",
-  "stateCode": "26",
-  "distCode": "8",
-  "courtComplexCode": "1260008",
-  "estCode": "5",
-  "partyName": "RAHUL",
-  "partyType": "P",
-  "caseStatus": "Pending",
-  "captcha": "AB12C"
+  "sessionId": "{{session_id}}",
+  "stateCode": "10",
+  "distCode": "13",
+  "courtComplexCode": "1100124"
 }
 ```
 
-## 5. Case Number Search
+## 5) Set Fields
 ```bash
-curl -X POST "https://<your-district-domain>/api/casenumber/case-data" \
+curl -X POST "https://district-court-scraper.onrender.com/api/common/set-fields" \
   -H "Content-Type: application/json" \
   -d '{
-    "sessionId": "<sessionId>",
-    "stateCode": "26",
-    "distCode": "8",
-    "courtComplexCode": "1260008",
-    "caseType": "1",
-    "caseNo": "123",
-    "caseYear": "2024",
-    "captcha": "AB12C"
+    "sessionId": "{{session_id}}",
+    "complexCode": "1100124@1,3,4,5,9,14,15,16,24,26@N",
+    "stateCode": "10",
+    "distCode": "13",
+    "estCode": ""
   }'
 ```
+Postman Body:
+```json
+{
+  "sessionId": "{{session_id}}",
+  "complexCode": "1100124@1,3,4,5,9,14,15,16,24,26@N",
+  "stateCode": "10",
+  "distCode": "13",
+  "estCode": ""
+}
+```
 
-## 6. CNR Search
+## 6) Get Captcha
 ```bash
-curl -X POST "https://<your-district-domain>/api/cnr/search" \
+curl -X GET "https://district-court-scraper.onrender.com/api/common/captcha?sessionId={{session_id}}"
+```
+
+## 7) Case Data by Party Name
+```bash
+curl -X POST "https://district-court-scraper.onrender.com/api/partyname/case-data" \
   -H "Content-Type: application/json" \
   -d '{
-    "sessionId": "<sessionId>",
-    "cnrNumber": "DLCT010000012024",
-    "captcha": "AB12C"
+    "sessionId": "{{session_id}}",
+    "petresName": "kumar",
+    "rgyearP": "2026",
+    "caseStatus": "Both",
+    "captchaCode": "mmtrmb"
   }'
 ```
+Postman Body:
+```json
+{
+  "sessionId": "{{session_id}}",
+  "petresName": "kumar",
+  "rgyearP": "2026",
+  "caseStatus": "Both",
+  "captchaCode": "mmtrmb"
+}
+```
 
-## 7. Case Detail + Order PDF
+## 8) Case Detail
 ```bash
-curl -X POST "https://<your-district-domain>/api/common/case-detail" \
+curl -X POST "https://district-court-scraper.onrender.com/api/partyname/case-detail" \
   -H "Content-Type: application/json" \
-  -d '{"sessionId":"<sessionId>","cino":"<cino>"}'
+  -d '{
+    "sessionId": "{{session_id}}",
+    "caseNo": "230200001272026",
+    "cino": "TNCH010195842025",
+    "courtCode": "1",
+    "hideparty": "",
+    "searchFlag": "CScaseNumber",
+    "stateCode": "10",
+    "distCode": "13",
+    "complexCode": "1100124",
+    "searchBy": "CSpartyName"
+  }'
+```
+Postman Body:
+```json
+{
+  "sessionId": "{{session_id}}",
+  "caseNo": "230200001272026",
+  "cino": "TNCH010195842025",
+  "courtCode": "1",
+  "hideparty": "",
+  "searchFlag": "CScaseNumber",
+  "stateCode": "10",
+  "distCode": "13",
+  "complexCode": "1100124",
+  "searchBy": "CSpartyName"
+}
+```
 
-curl "https://<your-district-domain>/api/partyname/order-pdf?sessionId=<sessionId>&orderPath=<orderPath>" -o order.pdf
+## 9) IA Business
+```bash
+curl -X POST "https://district-court-scraper.onrender.com/api/partyname/ia-business" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sessionId": "{{session_id}}",
+    "ia_no": "300000012025",
+    "cinoia": "TNCH010195842025",
+    "ia_case_type_name": "IA",
+    "ia_filno": "1",
+    "ia_filyear": "2025",
+    "national_court_code": "TNCH01",
+    "search_by": "CSpartyName"
+  }'
+```
+Postman Body:
+```json
+{
+  "sessionId": "{{session_id}}",
+  "ia_no": "300000012025",
+  "cinoia": "TNCH010195842025",
+  "ia_case_type_name": "IA",
+  "ia_filno": "1",
+  "ia_filyear": "2025",
+  "national_court_code": "TNCH01",
+  "search_by": "CSpartyName"
+}
+```
+
+## 10) Business Detail
+```bash
+curl -X POST "https://district-court-scraper.onrender.com/api/partyname/business-detail" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sessionId": "{{session_id}}",
+    "cino": "TNCH010195842025",
+    "court_code": "1",
+    "dist_code": "13",
+    "nextdate1": "20260330",
+    "case_number1": "TNCH010195842025",
+    "state_code": "10",
+    "disposal_flag": "Pending",
+    "businessDate": "25-03-2026",
+    "court_no": "1",
+    "national_court_code": "TNCH01",
+    "search_by": "CSpartyName",
+    "srno": "1"
+  }'
+```
+Postman Body:
+```json
+{
+  "sessionId": "{{session_id}}",
+  "cino": "TNCH010195842025",
+  "court_code": "1",
+  "dist_code": "13",
+  "nextdate1": "20260330",
+  "case_number1": "TNCH010195842025",
+  "state_code": "10",
+  "disposal_flag": "Pending",
+  "businessDate": "25-03-2026",
+  "court_no": "1",
+  "national_court_code": "TNCH01",
+  "search_by": "CSpartyName",
+  "srno": "1"
+}
+```
+
+## 11) Order PDF
+```bash
+curl -X GET "https://district-court-scraper.onrender.com/api/partyname/order-pdf?sessionId={{session_id}}&normal_v={{normal_v}}&case_val={{case_val}}&court_code={{court_code}}&filename={{filename}}&appFlag={{appFlag}}"
 ```
