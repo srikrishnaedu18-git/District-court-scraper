@@ -8,7 +8,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon server.js",
     "gateway:start": "node gateway/server.js",
-    "gateway:dev": "nodemon gateway/server.js"
+    "gateway:dev": "nodemon gateway/server.js",
+    "render:start": "node start-render.js"
   },
   "author": "",
   "license": "ISC",

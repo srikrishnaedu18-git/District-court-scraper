@@ -5,6 +5,8 @@ const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
+const crypto = require("crypto");
+const { sendError } = require("./utils/errorResponse");
 
 const { corsOptions } = require("./config/cors");
 const { requestLogger } = require("./middleware/request-logger.middleware");
@@ -26,13 +28,18 @@ const app = express();
 // ─── 1. Security headers ────────────────────────────────────────────────────
 app.use(helmet());
 
+app.use((req, _res, next) => {
+  req.id = req.headers["x-request-id"] || crypto.randomUUID();
+  next();
+});
+
 // ─── 2. CORS (locked to ALLOWED_ORIGINS) ────────────────────────────────────
 app.use(cors(corsOptions));
 
 // ─── 3. Body / cookie parsers ────────────────────────────────────────────────
 app.use(cookieParser());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "10kb" }));
+app.use(express.urlencoded({ extended: true, limit: "10kb" }));
 
 // ─── 4. Global rate limiter (60 req / min / IP) ──────────────────────────────
 const globalLimiter = rateLimit({
@@ -40,7 +47,14 @@ const globalLimiter = rateLimit({
   max: 60,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, error: "Too many requests" },
+  handler: (req, res) => sendError(res, req, {
+    status: 429,
+    code: "RATE_LIMITED",
+    message: "Too many requests",
+    area: "internal",
+    reason: "The backend rate limit was exceeded.",
+    details: { windowMs: 60 * 1000, max: 60 },
+  }),
 });
 app.use(globalLimiter);
 
