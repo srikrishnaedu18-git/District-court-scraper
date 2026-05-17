@@ -7,15 +7,17 @@ const cors = require("cors");
 const rateLimit = require("express-rate-limit");
 const axios = require("axios");
 const crypto = require("crypto");
+const { corsOptions } = require("../src/config/cors");
 const { buildErrorResponse } = require("../src/utils/errorResponse");
 
 const app = express();
-const PORT = Number(process.env.PORT || process.env.GATEWAY_PORT || 4000);
+const isRender = Boolean(process.env.RENDER || process.env.RENDER_SERVICE_ID);
+const PORT = Number(process.env.GATEWAY_PORT || (isRender ? process.env.PORT : "") || 4000);
 const INTERNAL_URL = process.env.INTERNAL_SERVICE_URL || "http://127.0.0.1:3000";
 const HMAC_SECRET = process.env.INTERNAL_HMAC_SECRET || process.env.HMAC_SECRET;
 
 app.use(helmet());
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(rateLimit({ windowMs: 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false }));
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
@@ -34,6 +36,7 @@ function forwardHeaders(req) {
   delete headers.host;
   delete headers.connection;
   delete headers["content-length"];
+  delete headers.origin;
   delete headers["x-signature"];
   delete headers["x-timestamp"];
   headers["x-request-id"] = req.id;
@@ -61,7 +64,8 @@ app.use(async (req, res) => {
 
     res.status(response.status);
     for (const [key, value] of Object.entries(response.headers || {})) {
-      if (key.toLowerCase() === "transfer-encoding") continue;
+      const header = key.toLowerCase();
+      if (header === "transfer-encoding" || header.startsWith("access-control-")) continue;
       res.setHeader(key, value);
     }
     return res.send(response.data);
