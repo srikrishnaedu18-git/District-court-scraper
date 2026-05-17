@@ -1,16 +1,15 @@
 "use strict";
 
+const { sendError } = require("../utils/errorResponse");
+
 function notFound(req, res) {
-  return res.status(404).json({
-    success: false,
-    status: 0,
-    message: "Not Found",
-    result: {},
-    rawHtml: null,
-    path: req.originalUrl,
+  return sendError(res, req, {
+    status: 404,
+    code: "ROUTE_NOT_FOUND",
+    message: "Route not found",
+    area: "internal",
+    reason: "No backend route matches this method and path.",
   });
 }
 
-module.exports = {
-  notFound,
-};
+module.exports = { notFound };

@@ -1,5 +1,65 @@
 # Jurident eCourts Party Name API
 
+## Index
+
+- [Render Deployment Guide](./Render-deploy.md)
+- [Base URLs](#base-urls)
+- [Run Locally](#run-locally)
+- [API Flow](#api-flow)
+- [Important Implementation Notes](#important-implementation-notes)
+- [Frontend Integration Using `mainport1.js`](#frontend-integration-using-mainport1js)
+  - [Court Complex and Establishment Mapping](#court-complex-and-establishment-mapping)
+  - [How Frontend Should Handle `Y` and `N`](#how-frontend-should-handle-y-and-n)
+  - [Recommended UI Rule for Showing the Establishment Division](#recommended-ui-rule-for-showing-the-establishment-division)
+  - [When to Trigger `/api/common/set-fields`](#when-to-trigger-apicommonset-fields)
+  - [Mapping to `mainport1.js` Search Functions](#mapping-to-mainport1js-search-functions)
+- [Formal Frontend Mapping](#formal-frontend-mapping)
+- [Business Detail API and Frontend Printing](#business-detail-api-and-frontend-printing)
+  - [Recommended Frontend Business Detail Flow](#recommended-frontend-business-detail-flow)
+  - [Recommended Print Strategy](#recommended-print-strategy)
+- [Formal Mapping for the Establishment Division](#formal-mapping-for-the-establishment-division)
+- [Common APIs](#common-apis)
+  - [1. Initialize Session](#1-initialize-session)
+  - [2. Get Captcha JSON](#2-get-captcha-json)
+  - [3. Get Captcha Image Stream](#3-get-captcha-image-stream)
+  - [4. Get Districts](#4-get-districts)
+  - [5. Get Courts](#5-get-courts)
+  - [6. Get Establishments](#6-get-establishments)
+  - [7. Set Court Context](#7-set-court-context)
+- [Party Name APIs](#party-name-apis)
+  - [1. Search by Party Name](#1-search-by-party-name)
+  - [2. Get Case Detail](#2-get-case-detail)
+  - [3. IA Business](#3-ia-business)
+  - [4. Business Detail](#4-business-detail)
+  - [5. Order PDF Metadata](#5-order-pdf-metadata)
+  - [6. Order PDF Binary Proxy](#6-order-pdf-binary-proxy)
+- [Error Handling](#error-handling)
+- [Frontend Mapping Notes](#frontend-mapping-notes)
+- [Health Check](#health-check)
+- [Security Hardening](#security-hardening)
+- [1. Purpose and Scope](#1-purpose-and-scope)
+- [2. Security Architecture (Current)](#2-security-architecture-current)
+- [3. Request Flow (End-to-End)](#3-request-flow-end-to-end)
+- [4. Controls and What They Prevent](#4-controls-and-what-they-prevent)
+- [5. Threat Model Coverage](#5-threat-model-coverage)
+- [6. Required Environment Variables](#6-required-environment-variables)
+- [7. Deployment Boundary Rules](#7-deployment-boundary-rules)
+- [8. Verification Checklist](#8-verification-checklist)
+- [9. Operational Notes](#9-operational-notes)
+- [Curl Examples](#curl-examples)
+- [1) Initialize Session](#1-initialize-session-1)
+- [2) Get Districts](#2-get-districts)
+- [3) Get Courts](#3-get-courts)
+- [4) Get Establishments](#4-get-establishments)
+- [5) Set Fields](#5-set-fields)
+- [6) Get Captcha](#6-get-captcha)
+- [7) Case Data by Party Name](#7-case-data-by-party-name)
+- [8) Case Detail](#8-case-detail)
+- [9) IA Business](#9-ia-business)
+- [10) Business Detail](#10-business-detail)
+- [11) Order PDF](#11-order-pdf)
+
+
 Express service for integrating with the Indian eCourts portal and exposing a cleaner API for:
 
 - session bootstrap
@@ -972,4 +1032,320 @@ Response:
 {
   "ok": true
 }
+```
+
+---
+
+## Security Hardening
+
+# District-court-scraper Security Hardening Walkthrough
+
+## 1. Purpose and Scope
+This document covers the complete security-hardening implementation for District-court-scraper and the threats it addresses.
+
+## 2. Security Architecture (Current)
+- Frontend sends all traffic to District Gateway.
+- Gateway signs `/api/*` requests with HMAC server-side.
+- Internal District backend verifies HMAC before protected routes.
+- Existing API contracts remain unchanged.
+
+## 3. Request Flow (End-to-End)
+1. Gateway receives client request.
+2. Gateway applies security headers/CORS/rate controls.
+3. Gateway generates `x-timestamp` and `x-signature` for `/api/*`.
+4. Gateway forwards request to internal backend.
+5. Backend applies Helmet, CORS, rate limiting, and request logging.
+6. Backend verifies HMAC and timestamp validity.
+7. Route/controller logic executes.
+8. Not-found/error handlers return controlled output.
+
+## 4. Controls and What They Prevent
+- Helmet headers:
+  Strengthens browser-side security posture.
+- CORS allow-list:
+  Prevents unauthorized browser origins in production.
+- Rate limiting:
+  Reduces high-volume abuse and scraping bursts.
+- Gateway-only secret handling:
+  Prevents frontend secret exposure.
+- Backend HMAC verification:
+  Prevents unsigned direct backend calls.
+- Replay-window timestamp checks:
+  Prevents reuse of captured signatures.
+- Timing-safe signature comparison:
+  Reduces timing attack risk in compare operation.
+- Request logging + burst alerts:
+  Detects suspicious traffic patterns early.
+- Safe error handling:
+  Prevents internal implementation leakage.
+
+## 5. Threat Model Coverage
+- Direct access to internal backend endpoints:
+  Denied without valid gateway signature.
+- Replay of old signed requests:
+  Denied by timestamp expiration logic.
+- Frontend reverse engineering for secret theft:
+  No HMAC secret on client side.
+- Automated scraping bursts:
+  Rate-limited and logged.
+
+## 6. Required Environment Variables
+Gateway:
+- `GATEWAY_PORT`
+- `INTERNAL_SERVICE_URL`
+- `INTERNAL_HMAC_SECRET` (preferred) or `HMAC_SECRET`
+
+Backend:
+- `PORT`
+- `INTERNAL_HMAC_SECRET` (preferred) or `HMAC_SECRET`
+- existing District envs (`ALLOWED_ORIGINS`, service config)
+
+## 7. Deployment Boundary Rules
+- Public endpoint = Gateway only.
+- Backend must stay internal-only.
+- Gateway/backend secret must match for that service pair.
+- Rotate and audit secrets/signature failures periodically.
+
+## 8. Verification Checklist
+- Gateway `/health` returns `200`.
+- Gateway `/api/*` succeeds without client HMAC headers.
+- Direct backend `/api/*` without signature returns `401`.
+- Tampered/expired signatures are rejected.
+
+## 9. Operational Notes
+- API names, payload keys, and frontend flow remain stable.
+- Hardening is implemented by gateway + backend middleware layers.
+
+---
+
+## Curl Examples
+
+# District Court API - cURL + Postman Raw JSON
+
+Base URL:
+`https://district-court-scraper.onrender.com`
+
+## 1) Initialize Session
+```bash
+curl -X POST "https://district-court-scraper.onrender.com/api/common/init" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+Postman Body:
+```json
+{}
+```
+
+## 2) Get Districts
+```bash
+curl -X POST "https://district-court-scraper.onrender.com/api/common/districts" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sessionId": "{{session_id}}",
+    "stateCode": "26"
+  }'
+```
+Postman Body:
+```json
+{
+  "sessionId": "{{session_id}}",
+  "stateCode": "26"
+}
+```
+
+## 3) Get Courts
+```bash
+curl -X POST "https://district-court-scraper.onrender.com/api/common/courts" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sessionId": "{{session_id}}",
+    "stateCode": "10",
+    "distCode": "13"
+  }'
+```
+Postman Body:
+```json
+{
+  "sessionId": "{{session_id}}",
+  "stateCode": "10",
+  "distCode": "13"
+}
+```
+
+## 4) Get Establishments
+```bash
+curl -X POST "https://district-court-scraper.onrender.com/api/common/establishments" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sessionId": "{{session_id}}",
+    "stateCode": "10",
+    "distCode": "13",
+    "courtComplexCode": "1100124"
+  }'
+```
+Postman Body:
+```json
+{
+  "sessionId": "{{session_id}}",
+  "stateCode": "10",
+  "distCode": "13",
+  "courtComplexCode": "1100124"
+}
+```
+
+## 5) Set Fields
+```bash
+curl -X POST "https://district-court-scraper.onrender.com/api/common/set-fields" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sessionId": "{{session_id}}",
+    "complexCode": "1100124@1,3,4,5,9,14,15,16,24,26@N",
+    "stateCode": "10",
+    "distCode": "13",
+    "estCode": ""
+  }'
+```
+Postman Body:
+```json
+{
+  "sessionId": "{{session_id}}",
+  "complexCode": "1100124@1,3,4,5,9,14,15,16,24,26@N",
+  "stateCode": "10",
+  "distCode": "13",
+  "estCode": ""
+}
+```
+
+## 6) Get Captcha
+```bash
+curl -X GET "https://district-court-scraper.onrender.com/api/common/captcha?sessionId={{session_id}}"
+```
+
+## 7) Case Data by Party Name
+```bash
+curl -X POST "https://district-court-scraper.onrender.com/api/partyname/case-data" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sessionId": "{{session_id}}",
+    "petresName": "kumar",
+    "rgyearP": "2026",
+    "caseStatus": "Both",
+    "captchaCode": "mmtrmb"
+  }'
+```
+Postman Body:
+```json
+{
+  "sessionId": "{{session_id}}",
+  "petresName": "kumar",
+  "rgyearP": "2026",
+  "caseStatus": "Both",
+  "captchaCode": "mmtrmb"
+}
+```
+
+## 8) Case Detail
+```bash
+curl -X POST "https://district-court-scraper.onrender.com/api/partyname/case-detail" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sessionId": "{{session_id}}",
+    "caseNo": "230200001272026",
+    "cino": "TNCH010195842025",
+    "courtCode": "1",
+    "hideparty": "",
+    "searchFlag": "CScaseNumber",
+    "stateCode": "10",
+    "distCode": "13",
+    "complexCode": "1100124",
+    "searchBy": "CSpartyName"
+  }'
+```
+Postman Body:
+```json
+{
+  "sessionId": "{{session_id}}",
+  "caseNo": "230200001272026",
+  "cino": "TNCH010195842025",
+  "courtCode": "1",
+  "hideparty": "",
+  "searchFlag": "CScaseNumber",
+  "stateCode": "10",
+  "distCode": "13",
+  "complexCode": "1100124",
+  "searchBy": "CSpartyName"
+}
+```
+
+## 9) IA Business
+```bash
+curl -X POST "https://district-court-scraper.onrender.com/api/partyname/ia-business" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sessionId": "{{session_id}}",
+    "ia_no": "300000012025",
+    "cinoia": "TNCH010195842025",
+    "ia_case_type_name": "IA",
+    "ia_filno": "1",
+    "ia_filyear": "2025",
+    "national_court_code": "TNCH01",
+    "search_by": "CSpartyName"
+  }'
+```
+Postman Body:
+```json
+{
+  "sessionId": "{{session_id}}",
+  "ia_no": "300000012025",
+  "cinoia": "TNCH010195842025",
+  "ia_case_type_name": "IA",
+  "ia_filno": "1",
+  "ia_filyear": "2025",
+  "national_court_code": "TNCH01",
+  "search_by": "CSpartyName"
+}
+```
+
+## 10) Business Detail
+```bash
+curl -X POST "https://district-court-scraper.onrender.com/api/partyname/business-detail" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sessionId": "{{session_id}}",
+    "cino": "TNCH010195842025",
+    "court_code": "1",
+    "dist_code": "13",
+    "nextdate1": "20260330",
+    "case_number1": "TNCH010195842025",
+    "state_code": "10",
+    "disposal_flag": "Pending",
+    "businessDate": "25-03-2026",
+    "court_no": "1",
+    "national_court_code": "TNCH01",
+    "search_by": "CSpartyName",
+    "srno": "1"
+  }'
+```
+Postman Body:
+```json
+{
+  "sessionId": "{{session_id}}",
+  "cino": "TNCH010195842025",
+  "court_code": "1",
+  "dist_code": "13",
+  "nextdate1": "20260330",
+  "case_number1": "TNCH010195842025",
+  "state_code": "10",
+  "disposal_flag": "Pending",
+  "businessDate": "25-03-2026",
+  "court_no": "1",
+  "national_court_code": "TNCH01",
+  "search_by": "CSpartyName",
+  "srno": "1"
+}
+```
+
+## 11) Order PDF
+```bash
+curl -X GET "https://district-court-scraper.onrender.com/api/partyname/order-pdf?sessionId={{session_id}}&normal_v={{normal_v}}&case_val={{case_val}}&court_code={{court_code}}&filename={{filename}}&appFlag={{appFlag}}"
 ```
